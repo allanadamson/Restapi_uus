@@ -1,28 +1,17 @@
 import prisma from "../lib/prisma.js";
 import { Book } from "@prisma/client";
 
-export interface PaginatedResponse {
-  data: Book[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalItems: number;
-    itemsPerPage: number;
-    hasNextPage: boolean;
-    hasPreviousPage: boolean;
-  };
-}
+// ... PaginatedResponse liides jääb samaks ...
 
-// 1. GET - Kõik raamatud koos filtreerimise ja paginatsiooniga
+// 1. GET - Kõik raamatud (lisatud reviews: true)
 export async function getBooks(
   page: number, 
   limit: number, 
   filters: any, 
   sortBy: string, 
   order: 'asc' | 'desc'
-): Promise<PaginatedResponse> {
+): Promise<any> { // Muudetud any-ks, et mahutada ka reviews
   const skip = (page - 1) * limit;
-
   const where: any = {};
   if (filters.title) where.title = { contains: filters.title, mode: 'insensitive' };
   if (filters.language) where.language = filters.language;
@@ -34,31 +23,27 @@ export async function getBooks(
       take: limit,
       skip: skip,
       orderBy: { [sortBy]: order },
-      include: { author: true, publisher: true, genres: true } 
+      // LISATUD: reviews: true
+      include: { author: true, publisher: true, genres: true, reviews: true } 
     }),
     prisma.book.count({ where })
   ]);
 
   const totalPages = Math.ceil(totalItems / limit);
-
   return {
     data,
     pagination: {
-      currentPage: page,
-      totalPages,
-      totalItems,
-      itemsPerPage: limit,
-      hasNextPage: page < totalPages,
-      hasPreviousPage: page > 1
+      currentPage: page, totalPages, totalItems, itemsPerPage: limit,
+      hasNextPage: page < totalPages, hasPreviousPage: page > 1
     }
   };
 }
 
-// 2. GET BY ID
+// 2. GET BY ID (lisatud reviews: true)
 export async function getBookById(id: number) {
   return await prisma.book.findUnique({
     where: { id },
-    include: { author: true, publisher: true, genres: true }
+    include: { author: true, publisher: true, genres: true, reviews: true }
   });
 }
 
@@ -66,28 +51,21 @@ export async function getBookById(id: number) {
 export async function addBook(data: any) {
   const { genres, authorId, publisherId, ...bookFields } = data;
 
-  // Koostame andmeobjekti samm-sammult
   const insertData: any = {
     ...bookFields,
-    author: {
-      connect: { id: Number(authorId) }
-    },
-    publisher: {
-      connect: { id: Number(publisherId) }
-    }
+    author: { connect: { id: Number(authorId) } },
+    publisher: { connect: { id: Number(publisherId) } }
   };
 
-  // LISAME genres AINULT SIIS, KUI MASSIIV POLE TÜHI
-  // See garanteerib, et Prisma ei näe isegi "genres: []" võtit
   if (Array.isArray(genres) && genres.length > 0) {
     insertData.genres = {
-      connect: genres.map((id: number) => ({ id: Number(id) }))
+      connect: genres.map((id: any) => ({ id: Number(id) }))
     };
   }
 
   return await prisma.book.create({
     data: insertData,
-    include: { author: true, publisher: true, genres: true }
+    include: { author: true, publisher: true, genres: true, reviews: true }
   });
 }
 
@@ -99,18 +77,17 @@ export async function updateBook(id: number, data: any) {
     where: { id },
     data: {
       ...bookFields,
-      // Kui ID-d on kaasas, siis uuendame seoseid
       author: authorId ? { connect: { id: Number(authorId) } } : undefined,
       publisher: publisherId ? { connect: { id: Number(publisherId) } } : undefined,
       genres: genres ? {
-        set: genres.map((id: number) => ({ id: Number(id) }))
+        set: genres.map((id: any) => ({ id: Number(id) }))
       } : undefined
     },
-    include: { author: true, publisher: true, genres: true }
+    include: { author: true, publisher: true, genres: true, reviews: true }
   });
 }
 
-// 5. DELETE
+// 5. DELETE jääb samaks...
 export async function deleteBook(id: number) {
   try {
     await prisma.book.delete({ where: { id } });

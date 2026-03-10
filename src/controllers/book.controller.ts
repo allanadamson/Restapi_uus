@@ -16,7 +16,6 @@ export async function getBooks(req: Request, res: Response) {
       year: req.query.year ? parseInt(req.query.year as string) : undefined
     };
 
-    // Ootame andmeid andmebaasist
     const result = await BookService.getBooks(page, limit, filters, sortBy, order);
     res.json(result);
   } catch (error) {
@@ -27,9 +26,20 @@ export async function getBooks(req: Request, res: Response) {
 // 2. POST - Lisa uus raamat
 export async function addBook(req: Request, res: Response) {
   try {
+    // --- DEBUG LOGID ---
+    console.log("--- DEBUG START ---");
+    console.log("Kasutaja saatis:", JSON.stringify(req.body, null, 2));
+    if (req.body.genres) {
+      console.log("Genres tüüp:", typeof req.body.genres[0], "Väärtus:", req.body.genres[0]);
+    }
+    console.log("--- DEBUG END ---");
+
     const result = bookSchema.safeParse(req.body);
 
     if (!result.success) {
+      // Logime ka Zod-i täpse vea terminali, et näha mis väljaga ta tülitseb
+      console.log("Zod viga:", JSON.stringify(result.error.format(), null, 2));
+      
       return res.status(400).json({ 
         error: "Validation failed", 
         details: result.error.flatten().fieldErrors 
@@ -39,13 +49,12 @@ export async function addBook(req: Request, res: Response) {
     const book = await BookService.addBook(result.data);
     res.status(201).json(book);
   } catch (error: any) {
-  console.error("DEBUG ERROR:", error); // See ilmub Sinu terminali, kus server jookseb
-  res.status(500).json({ 
-    error: "Raamatu lisamine ebaõnnestus", 
-    message: error.message,
-    code: error.code // Prisma veakood (nt P2003)
-  });
-}
+    console.error("SERVER ERROR:", error);
+    res.status(500).json({ 
+      error: "Raamatu lisamine ebaõnnestus", 
+      message: error.message 
+    });
+  }
 }
 
 // 3. GET BY ID

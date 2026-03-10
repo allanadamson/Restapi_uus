@@ -9,7 +9,9 @@ export const bookSchema = z.object({
   description: z.string(),
   authorId: z.number().int(),
   publisherId: z.number().int(),
-  genres: z.array(z.string())
+  // MUUDA SIIN: string -> number ja lisa .optional() või .default([]), 
+  // et tühja massiiviga ei tekiks viga
+  genres: z.array(z.number()).optional() 
 });
 
 export const updateBookSchema = bookSchema.partial();
