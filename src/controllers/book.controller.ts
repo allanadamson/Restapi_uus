@@ -26,20 +26,9 @@ export async function getBooks(req: Request, res: Response) {
 // 2. POST - Lisa uus raamat
 export async function addBook(req: Request, res: Response) {
   try {
-    // --- DEBUG LOGID ---
-    console.log("--- DEBUG START ---");
-    console.log("Kasutaja saatis:", JSON.stringify(req.body, null, 2));
-    if (req.body.genres) {
-      console.log("Genres tüüp:", typeof req.body.genres[0], "Väärtus:", req.body.genres[0]);
-    }
-    console.log("--- DEBUG END ---");
-
     const result = bookSchema.safeParse(req.body);
 
     if (!result.success) {
-      // Logime ka Zod-i täpse vea terminali, et näha mis väljaga ta tülitseb
-      console.log("Zod viga:", JSON.stringify(result.error.format(), null, 2));
-      
       return res.status(400).json({ 
         error: "Validation failed", 
         details: result.error.flatten().fieldErrors 
@@ -49,7 +38,6 @@ export async function addBook(req: Request, res: Response) {
     const book = await BookService.addBook(result.data);
     res.status(201).json(book);
   } catch (error: any) {
-    console.error("SERVER ERROR:", error);
     res.status(500).json({ 
       error: "Raamatu lisamine ebaõnnestus", 
       message: error.message 
@@ -67,7 +55,22 @@ export async function getBookById(req: Request, res: Response) {
   }
 }
 
-// 4. PATCH - Uuenda
+// 4. GET AVERAGE RATING (See uus funktsioon)
+export async function getBookRating(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: "Vigane raamatu ID" });
+    }
+
+    const ratingData = await BookService.getBookAverageRating(id);
+    res.json(ratingData);
+  } catch (error) {
+    res.status(500).json({ error: "Keskmise hinde arvutamine ebaõnnestus" });
+  }
+}
+
+// 5. PATCH - Uuenda
 export async function updateBook(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
@@ -92,7 +95,7 @@ export async function updateBook(req: Request, res: Response) {
   }
 }
 
-// 5. DELETE
+// 6. DELETE
 export async function deleteBook(req: Request, res: Response) {
   try {
     const deleted = await BookService.deleteBook(Number(req.params.id));

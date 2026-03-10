@@ -1,21 +1,41 @@
 import prisma from "../lib/prisma.js";
-import { Book } from "@prisma/client";
 
-// ... PaginatedResponse liides jääb samaks ...
+// Ühtne liides paginationi jaoks vastavalt ülesande nõuetele
+interface PaginatedResponse {
+  data: any[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
 
-// 1. GET - Kõik raamatud (lisatud reviews: true)
+// 1. GET - Kõik raamatud koos filtreerimise, sorteerimise ja paginationiga
 export async function getBooks(
   page: number, 
   limit: number, 
   filters: any, 
   sortBy: string, 
   order: 'asc' | 'desc'
-): Promise<any> { // Muudetud any-ks, et mahutada ka reviews
+): Promise<PaginatedResponse> {
   const skip = (page - 1) * limit;
+  
+  // Dünaamiline filtri objekt
   const where: any = {};
   if (filters.title) where.title = { contains: filters.title, mode: 'insensitive' };
   if (filters.language) where.language = filters.language;
   if (filters.year) where.publishedYear = Number(filters.year);
+  // Kui soovid lisada žanri filtrit (N:M seos)
+  if (filters.genre) {
+    where.genres = {
+      some: {
+        name: { contains: filters.genre, mode: 'insensitive' }
+      }
+    };
+  }
 
   const [data, totalItems] = await Promise.all([
     prisma.book.findMany({
@@ -23,31 +43,64 @@ export async function getBooks(
       take: limit,
       skip: skip,
       orderBy: { [sortBy]: order },
-      // LISATUD: reviews: true
-      include: { author: true, publisher: true, genres: true, reviews: true } 
+      include: { 
+        author: true, 
+        publisher: true, 
+        genres: true, 
+        reviews: true 
+      } 
     }),
     prisma.book.count({ where })
   ]);
 
   const totalPages = Math.ceil(totalItems / limit);
+
   return {
     data,
     pagination: {
-      currentPage: page, totalPages, totalItems, itemsPerPage: limit,
-      hasNextPage: page < totalPages, hasPreviousPage: page > 1
+      currentPage: page,
+      totalPages,
+      totalItems,
+      itemsPerPage: limit,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1
     }
   };
 }
 
-// 2. GET BY ID (lisatud reviews: true)
+// 2. GET BY ID
 export async function getBookById(id: number) {
   return await prisma.book.findUnique({
     where: { id },
-    include: { author: true, publisher: true, genres: true, reviews: true }
+    include: { 
+      author: true, 
+      publisher: true, 
+      genres: true, 
+      reviews: true 
+    }
   });
 }
 
-// 3. POST - Lisa uus raamat
+// 3. GET AVERAGE RATING (Nõutud OSA 2 punkt)
+export async function getBookAverageRating(bookId: number) {
+  const aggregate = await prisma.review.aggregate({
+    where: { bookId },
+    _avg: {
+      rating: true,
+    },
+    _count: {
+      rating: true,
+    },
+  });
+
+  return {
+    bookId,
+    averageRating: aggregate._avg.rating ? parseFloat(aggregate._avg.rating.toFixed(2)) : 0,
+    reviewCount: aggregate._count.rating,
+  };
+}
+
+// 4. POST - Lisa uus raamat
 export async function addBook(data: any) {
   const { genres, authorId, publisherId, ...bookFields } = data;
 
@@ -57,6 +110,7 @@ export async function addBook(data: any) {
     publisher: { connect: { id: Number(publisherId) } }
   };
 
+  // N:M seos žanritega (connect)
   if (Array.isArray(genres) && genres.length > 0) {
     insertData.genres = {
       connect: genres.map((id: any) => ({ id: Number(id) }))
@@ -69,7 +123,7 @@ export async function addBook(data: any) {
   });
 }
 
-// 4. PATCH - Uuenda
+// 5. PATCH - Uuenda raamatut
 export async function updateBook(id: number, data: any) {
   const { genres, authorId, publisherId, ...bookFields } = data;
 
@@ -87,7 +141,7 @@ export async function updateBook(id: number, data: any) {
   });
 }
 
-// 5. DELETE jääb samaks...
+// 6. DELETE
 export async function deleteBook(id: number) {
   try {
     await prisma.book.delete({ where: { id } });
