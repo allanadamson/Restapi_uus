@@ -25,15 +25,15 @@ app.get('/', (req: Request, res: Response) => {
   });
 });
 
-// 5. API Marsruudid (Kasutame juhendis nõutud /api/v1/ eesliidet)
+// 5. API Marsruudid
 app.use('/api/v1/books', bookRoutes);
 
-// 6. 404 Endpoint not found (kui ühtegi teist route-i ei leitud)
+// 6. 404 Endpoint not found
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: "Endpoint not found" });
 });
 
-// 7. Globaalne Error Handling Middleware (Kohustuslik tehniline osa)
+// 7. Globaalne Error Handling Middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error("Server Error:", err.stack);
   

@@ -6,7 +6,6 @@ const router = Router();
 router.get("/", BookController.getBooks);
 router.post("/", BookController.addBook);
 
-// See peab olema ENNE /:id teed!
 router.get("/:id/average-rating", BookController.getBookRating);
 
 router.get("/:id", BookController.getBookById);

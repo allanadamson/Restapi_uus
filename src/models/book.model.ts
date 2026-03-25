@@ -1,15 +1,15 @@
 export interface Book {
-  id: number;                // Hiljem Prismaga tõenäoliselt string/uuid
+  id: number;
   title: string;
-  isbn: string;              // Kohustuslik (validatsioonis kontrollitakse)
+  isbn: string;
   publishedYear: number;
-  pageCount: number;         // Kohustuslik
-  language: string;          // Kohustuslik (vajalik filtri jaoks)
+  pageCount: number;
+  language: string;
   description: string;
-  coverImage?: string;       // Optsionaalne
-  authorId: number;          // Seos Autoriga (juhendis nõutud)
-  publisherId: number;       // Seos Kirjastusega
-  genres: string[];          // Massiiv (N:M seos)
+  coverImage?: string;
+  authorId: number;
+  publisherId: number;
+  genres: string[];
   createdAt: Date;
   updatedAt: Date;
 }

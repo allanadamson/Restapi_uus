@@ -17,9 +17,10 @@
     "zod": "^4.3.6"
   },
   "scripts": {
-    "dev": "tsx watch --env-file=.env src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js"
+  "dev": "tsx watch --env-file=.env src/index.ts",
+  "build": "tsc",
+  "start": "node dist/index.js",
+  "seed": "prisma db seed"
   },
   "prisma": {
     "seed": "tsx --env-file=.env prisma/seed.ts"
