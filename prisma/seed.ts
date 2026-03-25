@@ -8,45 +8,92 @@ const adapter = new PrismaPg(pool)
 const prisma = new PrismaClient({ adapter })
 
 async function main() {
-  console.log('🌱 Alustan andmebaasi täitmist...')
+  console.log('🌱 Alustan mahuka andmebaasi täitmist...')
 
-  // 1. Loo Autor (kasutame upsert, et vältida duplikaatide vigu)
-  const author = await prisma.author.upsert({
-    where: { id: 1 },
-    update: {},
-    create: {
-      firstName: 'Anton Hansen',
-      lastName: 'Tammsaare',
-      birthYear: 1878,
-      nationality: 'Estonian'
-    },
-  })
+  // Kustutame vana sisu, et uued andmed saaksid puhtalt peale tulla
+  await prisma.review.deleteMany()
+  await prisma.book.deleteMany()
+  await prisma.author.deleteMany()
+  await prisma.publisher.deleteMany()
 
-  // 2. Loo Kirjastaja
-  // EEMALDATUD 'city', kuna seda pole skeemas!
-  const publisher = await prisma.publisher.upsert({
-    where: { id: 1 },
-    update: {},
-    create: {
-      name: 'Noor-Eesti',
-      country: 'Estonia',
-      foundedYear: 1905
-    },
-  })
+  // 1. ŽANRID (Võtsin descriptioni välja, kuna seda pole skeemas)
+  const genreNames = ['Klassika', 'Draama', 'Ulme', 'Krimka', 'Ajalugu']
+  
+  for (const name of genreNames) {
+    await prisma.genre.upsert({
+      where: { name: name },
+      update: {},
+      create: { name: name }
+    })
+  }
+  const allGenres = await prisma.genre.findMany()
 
-  // 3. Loo Žanr
-  const genre = await prisma.genre.upsert({
-    where: { name: 'Klassika' },
-    update: {},
-    create: {
-      name: 'Klassika'
-    },
-  })
+  // 2. KIRJASTAJAD
+  const publishersData = [
+    { id: 1, name: 'Noor-Eesti', country: 'Estonia', foundedYear: 1905 },
+    { id: 2, name: 'Varrak', country: 'Estonia', foundedYear: 1991 },
+    { id: 3, name: 'Tänapäev', country: 'Estonia', foundedYear: 1999 },
+    { id: 4, name: 'Penguin Books', country: 'UK', foundedYear: 1935 },
+  ]
+  for (const pub of publishersData) {
+    await prisma.publisher.upsert({
+      where: { id: pub.id },
+      update: {},
+      create: pub
+    })
+  }
 
-  console.log('✅ Andmed on kontrollitud/sisestatud:', { 
-    authorId: author.id, 
-    publisherId: publisher.id 
-  })
+  // 3. AUTORID
+  const authorsData = [
+    { id: 1, firstName: 'Anton Hansen', lastName: 'Tammsaare', birthYear: 1878, nationality: 'Estonian' },
+    { id: 2, firstName: 'Eduard', lastName: 'Vilde', birthYear: 1865, nationality: 'Estonian' },
+    { id: 3, firstName: 'Oskar', lastName: 'Luts', birthYear: 1887, nationality: 'Estonian' },
+    { id: 4, firstName: 'Marie', lastName: 'Under', birthYear: 1883, nationality: 'Estonian' },
+    { id: 5, firstName: 'Jaan', lastName: 'Kross', birthYear: 1920, nationality: 'Estonian' },
+    { id: 6, firstName: 'Andrus', lastName: 'Kivirähk', birthYear: 1970, nationality: 'Estonian' },
+  ]
+  for (const auth of authorsData) {
+    await prisma.author.upsert({
+      where: { id: auth.id },
+      update: {},
+      create: auth
+    })
+  }
+
+  // 4. RAAMATUD (15 tükki)
+  // LISASIN SIIA 'description', kuna tundub, et see on Book tabelis nõutud!
+  for (let i = 1; i <= 15; i++) {
+    await prisma.book.upsert({
+      where: { id: i },
+      update: {},
+      create: {
+        id: i,
+        title: `Eesti Kirjanduse Varamu Vol ${i}`,
+        isbn: `978-9985-01-${1000 + i}`,
+        publishedYear: 1900 + (i * 5),
+        pageCount: 150 + (i * 20),
+        language: 'Estonian',
+        description: `See on väga huvitav raamat, osa ${i} seeriast.`, // <--- TÕENÄOLINE ASUKOHT
+        authorId: (i % 6) + 1,
+        publisherId: (i % 4) + 1,
+        genres: {
+          connect: { id: allGenres[i % allGenres.length].id }
+        }
+      }
+    })
+
+    // 5. ARVUSTUSED
+    await prisma.review.create({
+      data: {
+        bookId: i,
+        userName: i % 2 === 0 ? 'Kalle' : 'Mari',
+        rating: (i % 5) + 1,
+        comment: 'Huvitav lugemine!'
+      }
+    })
+  }
+
+  console.log('✅ EDU! Andmed on Supabases.')
 }
 
 main()
