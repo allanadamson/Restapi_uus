@@ -10,19 +10,18 @@ export async function createReview(data: {
     data: {
       userName: data.userName,
       rating: data.rating,
-      comment: data.comment,
-      // Seostame arvustuse raamatuga läbi bookId
+      // Tagame, et comment on alati string (või null, kui schema lubab)
+      comment: data.comment ?? "", 
       book: {
-        connect: { id: data.bookId }
+        connect: { id: Number(data.bookId) }
       }
     }
   });
 }
 
-// See funktsioon aitab hiljem leida kõik ühe raamatu arvustused
 export async function getReviewsByBookId(bookId: number) {
   return await prisma.review.findMany({
-    where: { bookId },
+    where: { bookId: Number(bookId) },
     orderBy: { createdAt: 'desc' }
   });
 }

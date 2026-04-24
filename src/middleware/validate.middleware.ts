@@ -1,6 +1,5 @@
-// src/middleware/validate.middleware.ts
-import { Request, Response, NextFunction } from "express";
-import { AnyZodObject, ZodError } from "zod";
+import { Request, Response, NextFunction } from 'express';
+import { AnyZodObject, ZodError } from 'zod';
 
 export const validate = (schema: AnyZodObject) => 
   (req: Request, res: Response, next: NextFunction) => {
@@ -11,13 +10,13 @@ export const validate = (schema: AnyZodObject) =>
         params: req.params,
       });
       next();
-    } catch (e) {
-      if (e instanceof ZodError) {
+    } catch (error: any) {
+      if (error instanceof ZodError) {
         return res.status(400).json({
-          error: "Valideerimise viga",
-          details: e.errors.map(err => ({ path: err.path[1], message: err.message }))
+          status: 'fail',
+          error: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
         });
       }
-      next(e);
+      return res.status(500).json({ error: 'Valideerimise viga' });
     }
   };
