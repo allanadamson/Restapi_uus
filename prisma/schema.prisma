@@ -1,9 +1,12 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Author {
@@ -37,13 +40,12 @@ model Book {
   description   String
   coverImage    String?
   
-  // Seosed
   author        Author    @relation(fields: [authorId], references: [id])
   authorId      Int
   publisher     Publisher @relation(fields: [publisherId], references: [id])
   publisherId   Int
   
-  genres        Genre[]   // N:M seos (Prisma loob automaatselt vahetabeli)
+  genres        Genre[]   
   reviews       Review[]
   
   createdAt     DateTime  @default(now())
@@ -64,7 +66,7 @@ model Review {
   book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
   bookId    Int
   userName  String
-  rating    Int      // 1-5
+  rating    Int      
   comment   String
   createdAt DateTime @default(now())
 }

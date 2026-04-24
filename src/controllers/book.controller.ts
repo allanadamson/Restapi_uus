@@ -2,104 +2,75 @@ import * as BookService from "../services/book.service.js";
 import { Request, Response } from "express";
 import { bookSchema, updateBookSchema } from "../validators/book.validator.js";
 
-// 1. GET - Kõik raamatud (Otsing, Sort, Pagination)
 export async function getBooks(req: Request, res: Response) {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const sortBy = (req.query.sortBy as string) || "title";
-    const order = (req.query.order as "asc" | "desc") || "asc";
-    
-    // Lisame 'search' parameetri, et saaksid pealkirja järgi otsida
-    const filters = {
-      search: req.query.search as string,
-      language: req.query.language as string,
-      year: req.query.year ? parseInt(req.query.year as string) : undefined
-    };
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
 
-    const result = await BookService.getBooks(page, limit, filters, sortBy, order);
-    
-    // Ühtne response formaat (Andmed + Pagination metaandmed)
-    res.json(result);
+    const result = await BookService.getBooks(page, limit, {
+      search: req.query.search as string | undefined,
+    });
+
+    return res.json(result);
   } catch (error) {
-    console.error("Viga getBooks:", error);
-    res.status(500).json({ error: "Andmete pärimine ebaõnnestus" });
+    console.error("GET BOOKS ERROR:", error);
+    return res.status(500).json({ error: "Andmete pärimine ebaõnnestus" });
+  }
+}
+export async function getBookById(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "Vigane raamatu ID" });
+    }
+
+    const book = await BookService.getBookById(id);
+
+    if (!book) {
+      return res.status(404).json({ error: "Raamatut ei leitud" });
+    }
+
+    return res.json(book);
+  } catch (error) {
+    console.error("GET BOOK BY ID ERROR:", error);
+    return res.status(500).json({ error: "Serveri viga" });
   }
 }
 
-// 2. POST - Lisa uus raamat (Valideerimine + 201 status)
 export async function addBook(req: Request, res: Response) {
   try {
     const result = bookSchema.safeParse(req.body);
 
     if (!result.success) {
-      return res.status(400).json({ 
-        error: "Valideerimise viga", 
-        details: result.error.flatten().fieldErrors 
+      return res.status(400).json({
+        error: "Vigased andmed",
+        details: result.error.format(),
       });
     }
 
     const book = await BookService.addBook(result.data);
-    res.status(201).json(book);
-  } catch (error: any) {
-    // 409 Conflict, kui raamat on juba olemas (nt ISBN kattub)
-    if (error.code === 'P2002') {
-      return res.status(409).json({ error: "Sellise ISBN-iga raamat on juba olemas" });
-    }
-    res.status(500).json({ error: "Raamatu lisamine ebaõnnestus" });
-  }
-}
-
-// 3. GET BY ID (Koos seostega)
-export async function getBookById(req: Request, res: Response) {
-  try {
-    const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ error: "Vigane ID formaat" });
-
-    const book = await BookService.getBookById(id);
-    
-    if (!book) {
-      return res.status(404).json({ error: "Raamatut ei leitud" });
-    }
-    
-    res.json(book);
+    return res.status(201).json(book);
   } catch (error) {
-    res.status(500).json({ error: "Serveri viga raamatu leidmisel" });
+    console.error("ADD BOOK ERROR:", error);
+    return res.status(500).json({ error: "Lisamine ebaõnnestus" });
   }
 }
 
-// 4. GET AVERAGE RATING (OSA 2 nõue)
-export async function getBookRating(req: Request, res: Response) {
-  try {
-    const id = Number(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: "Vigane raamatu ID" });
-    }
-
-    const ratingData = await BookService.getBookAverageRating(id);
-    
-    if (!ratingData) {
-      return res.status(404).json({ error: "Raamatut ei leitud või arvustused puuduvad" });
-    }
-
-    res.json(ratingData);
-  } catch (error) {
-    res.status(500).json({ error: "Keskmise hinde arvutamine ebaõnnestus" });
-  }
-}
-
-// 5. PATCH - Uuenda (Partial update)
 export async function updateBook(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ error: "Vigane ID" });
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "Vigane raamatu ID" });
+    }
 
     const result = updateBookSchema.safeParse(req.body);
 
     if (!result.success) {
-      return res.status(400).json({ 
-        error: "Valideerimise viga", 
-        details: result.error.flatten().fieldErrors 
+      return res.status(400).json({
+        error: "Vigased andmed",
+        details: result.error.format(),
       });
     }
 
@@ -109,26 +80,79 @@ export async function updateBook(req: Request, res: Response) {
       return res.status(404).json({ error: "Raamatut ei leitud" });
     }
 
-    res.json(updated);
+    return res.json(updated);
   } catch (error) {
-    res.status(500).json({ error: "Uuendamine ebaõnnestus" });
+    console.error("UPDATE BOOK ERROR:", error);
+    return res.status(500).json({ error: "Uuendamine ebaõnnestus" });
   }
 }
 
-// 6. DELETE (204 No Content edukal kustutamisel)
 export async function deleteBook(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ error: "Vigane ID" });
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "Vigane raamatu ID" });
+    }
 
     const deleted = await BookService.deleteBook(id);
-    
+
     if (!deleted) {
       return res.status(404).json({ error: "Raamatut ei leitud" });
     }
 
-    res.status(204).send();
+    return res.status(204).send();
   } catch (error) {
-    res.status(500).json({ error: "Kustutamine ebaõnnestus" });
+    console.error("DELETE BOOK ERROR:", error);
+    return res.status(500).json({ error: "Kustutamine ebaõnnestus" });
+  }
+}
+
+export async function getBookRating(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "Vigane raamatu ID" });
+    }
+
+    const rating = await BookService.getBookRating(id);
+
+    return res.json(rating);
+  } catch (error) {
+    console.error("GET BOOK RATING ERROR:", error);
+    return res.status(500).json({ error: "Hinnangu pärimine ebaõnnestus" });
+  }
+}
+
+export async function getBookReviews(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "Vigane raamatu ID" });
+    }
+
+    const reviews = await BookService.getBookReviews(id);
+    return res.json(reviews);
+  } catch (error) {
+    console.error("GET REVIEWS ERROR:", error);
+    return res.status(500).json({ error: "Arvustuste laadimine ebaõnnestus" });
+  }
+}
+
+export async function addBookReview(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "Vigane raamatu ID" });
+    }
+
+    const review = await BookService.addBookReview(id, req.body);
+    return res.status(201).json(review);
+  } catch (error) {
+    console.error("ADD REVIEW ERROR:", error);
+    return res.status(500).json({ error: "Arvustuse lisamine ebaõnnestus" });
   }
 }

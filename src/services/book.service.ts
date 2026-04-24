@@ -1,151 +1,244 @@
 import prisma from "../lib/prisma.js";
+import type { Prisma } from "@prisma/client";
 
-// Ühtne liides paginationi jaoks 
-interface PaginatedResponse {
-  data: any[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalItems: number;
-    itemsPerPage: number;
-    hasNextPage: boolean;
-    hasPreviousPage: boolean;
-  };
-}
+type SortBy = "title" | "publishedYear";
+type SortOrder = "asc" | "desc";
 
-// 1. GET - Kõik raamatud
+export type BookFilters = {
+  search?: string;
+  year?: string;
+  language?: string;
+  sortBy?: SortBy;
+  sortOrder?: SortOrder;
+};
+
+export type BookInput = {
+  title: string;
+  isbn: string;
+  publishedYear: number;
+  pageCount: number;
+  language: string;
+  description: string;
+  authorId: number;
+  publisherId: number;
+};
+
+export type BookUpdateInput = Partial<BookInput>;
+
 export async function getBooks(
-  page: number, 
-  limit: number, 
-  filters: any, 
-  sortBy: string, 
-  order: 'asc' | 'desc'
-): Promise<PaginatedResponse> {
-  const skip = (page - 1) * limit;
-  
-  const where: any = {};
-  
-  if (filters.search) {
+  page = 1,
+  limit = 10,
+  filters: BookFilters = {}
+) {
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.max(1, limit);
+  const skip = (safePage - 1) * safeLimit;
+
+  const search = filters.search?.trim();
+  const year = filters.year?.trim();
+  const language = filters.language?.trim();
+
+  const where: Prisma.BookWhereInput = {};
+
+  if (search) {
     where.OR = [
-      { title: { contains: filters.search, mode: 'insensitive' } },
-      { isbn: { contains: filters.search, mode: 'insensitive' } }
+      {
+        title: {
+          contains: search,
+          mode: "insensitive",
+        },
+      },
+      {
+        isbn: {
+          contains: search,
+          mode: "insensitive",
+        },
+      },
+      {
+        author: {
+          OR: [
+            {
+              firstName: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+            {
+              lastName: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+          ],
+        },
+      },
     ];
   }
-  if (filters.title) where.title = { contains: filters.title, mode: 'insensitive' };
-  if (filters.language) where.language = filters.language;
-  if (filters.year) where.publishedYear = Number(filters.year);
-  
-  if (filters.genre) {
-    where.genres = {
-      some: { name: { contains: filters.genre, mode: 'insensitive' } }
+
+  if (year && !Number.isNaN(Number(year))) {
+    where.publishedYear = Number(year);
+  }
+
+  if (language) {
+    where.language = {
+      contains: language,
+      mode: "insensitive",
     };
   }
 
-  const [data, totalItems] = await Promise.all([
+  const sortBy: SortBy = filters.sortBy ?? "title";
+  const sortOrder: SortOrder = filters.sortOrder ?? "asc";
+
+  const orderBy: Prisma.BookOrderByWithRelationInput = {
+    [sortBy]: sortOrder,
+  };
+
+  const [books, total] = await Promise.all([
     prisma.book.findMany({
       where,
-      take: limit,
-      skip: skip,
-      orderBy: { [sortBy]: order },
-      include: { 
-        author: true, 
-        publisher: true, 
-        genres: true, 
-      } 
+      skip,
+      take: safeLimit,
+      include: {
+        author: true,
+        publisher: true,
+        genres: true,
+        reviews: true,
+      },
+      orderBy,
     }),
-    prisma.book.count({ where })
+    prisma.book.count({ where }),
   ]);
 
-  const totalPages = Math.ceil(totalItems / limit);
-
   return {
-    data,
-    pagination: {
-      currentPage: page,
-      totalPages,
-      totalItems,
-      itemsPerPage: limit,
-      hasNextPage: page < totalPages,
-      hasPreviousPage: page > 1
-    }
+    data: books,
+    total,
+    page: safePage,
+    limit: safeLimit,
   };
 }
 
-// 2. GET BY ID
 export async function getBookById(id: number) {
-  return await prisma.book.findUnique({
+  return prisma.book.findUnique({
     where: { id },
-    include: { 
-      author: true, 
-      publisher: true, 
-      genres: true, 
-      reviews: true 
-    }
+    include: {
+      author: true,
+      publisher: true,
+      genres: true,
+      reviews: true,
+    },
   });
 }
 
-// 3. GET AVERAGE RATING (OSA 2: 2/2 punkti)
-export async function getBookAverageRating(bookId: number) {
-  const aggregate = await prisma.review.aggregate({
-    where: { bookId },
-    _avg: { rating: true },
-    _count: { rating: true },
-  });
-
-  return {
-    bookId,
-    averageRating: aggregate._avg.rating ? parseFloat(aggregate._avg.rating.toFixed(2)) : 0,
-    reviewCount: aggregate._count.rating,
-  };
-}
-
-// 4. POST - Lisa uus raamat
-export async function addBook(data: any) {
-  const { genreIds, authorId, publisherId, ...bookFields } = data;
-
-  const insertData: any = {
-    ...bookFields,
-    // Veendume, et ID-d on numbrid
-    author: authorId ? { connect: { id: Number(authorId) } } : undefined,
-    publisher: publisherId ? { connect: { id: Number(publisherId) } } : undefined
-  };
-
-  if (Array.isArray(genreIds) && genreIds.length > 0) {
-    insertData.genres = {
-      connect: genreIds.map((id: any) => ({ id: Number(id) }))
-    };
-  }
-
-  return await prisma.book.create({
-    data: insertData,
-    include: { author: true, genres: true }
+export async function addBook(data: BookInput) {
+  return prisma.book.create({
+    data: {
+      title: data.title,
+      isbn: data.isbn,
+      publishedYear: Number(data.publishedYear),
+      pageCount: Number(data.pageCount),
+      language: data.language,
+      description: data.description,
+      authorId: Number(data.authorId),
+      publisherId: Number(data.publisherId),
+    },
+    include: {
+      author: true,
+      publisher: true,
+      genres: true,
+      reviews: true,
+    },
   });
 }
 
-// 5. PATCH - Uuenda raamatut
-export async function updateBook(id: number, data: any) {
-  const { genreIds, authorId, publisherId, ...bookFields } = data;
+export async function updateBook(id: number, data: BookUpdateInput) {
+  const existing = await prisma.book.findUnique({
+    where: { id },
+  });
 
-  return await prisma.book.update({
+  if (!existing) return null;
+
+  return prisma.book.update({
     where: { id },
     data: {
-      ...bookFields,
-      author: authorId ? { connect: { id: Number(authorId) } } : undefined,
-      publisher: publisherId ? { connect: { id: Number(publisherId) } } : undefined,
-      genres: genreIds ? {
-        set: genreIds.map((id: any) => ({ id: Number(id) }))
-      } : undefined
+      ...(data.title !== undefined && { title: data.title }),
+      ...(data.isbn !== undefined && { isbn: data.isbn }),
+      ...(data.publishedYear !== undefined && {
+        publishedYear: Number(data.publishedYear),
+      }),
+      ...(data.pageCount !== undefined && {
+        pageCount: Number(data.pageCount),
+      }),
+      ...(data.language !== undefined && { language: data.language }),
+      ...(data.description !== undefined && {
+        description: data.description,
+      }),
+      ...(data.authorId !== undefined && {
+        authorId: Number(data.authorId),
+      }),
+      ...(data.publisherId !== undefined && {
+        publisherId: Number(data.publisherId),
+      }),
     },
-    include: { author: true, genres: true }
+    include: {
+      author: true,
+      publisher: true,
+      genres: true,
+      reviews: true,
+    },
   });
 }
 
-// 6. DELETE
 export async function deleteBook(id: number) {
-  try {
-    await prisma.book.delete({ where: { id } });
-    return true;
-  } catch (e) {
-    return false;
-  }
+  const existing = await prisma.book.findUnique({
+    where: { id },
+  });
+
+  if (!existing) return null;
+
+  return prisma.book.delete({
+    where: { id },
+  });
+}
+
+export async function getBookRating(id: number) {
+  const result = await prisma.review.aggregate({
+    where: {
+      bookId: id,
+    },
+    _avg: {
+      rating: true,
+    },
+    _count: {
+      rating: true,
+    },
+  });
+
+  return {
+    averageRating: result._avg.rating ?? 0,
+    reviewCount: result._count.rating,
+  };
+}
+
+export type ReviewInput = {
+  userName: string;
+  rating: number;
+  comment: string;
+};
+
+export async function getBookReviews(bookId: number) {
+  return prisma.review.findMany({
+    where: { bookId },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function addBookReview(bookId: number, data: ReviewInput) {
+  return prisma.review.create({
+    data: {
+      bookId,
+      userName: data.userName,
+      rating: Number(data.rating),
+      comment: data.comment,
+    },
+  });
 }

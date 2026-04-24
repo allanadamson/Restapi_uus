@@ -10,7 +10,6 @@ export async function createReview(data: {
     data: {
       userName: data.userName,
       rating: data.rating,
-      // Tagame, et comment on alati string (või null, kui schema lubab)
       comment: data.comment ?? "", 
       book: {
         connect: { id: Number(data.bookId) }

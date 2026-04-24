@@ -1,28 +1,30 @@
 {
-  "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/node": "^25.3.5",
-    "prisma": "^7.4.2",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "@faker-js/faker": "^10.3.0",
-    "@prisma/adapter-pg": "^7.4.2",
-    "@prisma/client": "^7.4.2",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "pg": "^8.20.0",
-    "zod": "^4.3.6"
-  },
+  "name": "backend",
+  "type": "module",
   "scripts": {
-  "dev": "tsx watch --env-file=.env src/index.ts",
-  "build": "tsc",
-  "start": "node dist/index.js",
-  "seed": "prisma db seed"
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
   },
   "prisma": {
-    "seed": "tsx --env-file=.env prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^5.x",
+    "@prisma/client": "^5.22.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "prisma": "^5.22.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.19.39",
+    "@types/pg": "^8.10.9",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.7.0",
+    "typescript": "^5.9.3"
   }
 }
